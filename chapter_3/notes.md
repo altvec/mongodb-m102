@@ -175,3 +175,33 @@ Summary of WiredTiger internals:
 - Two caches
   - WiredTiger cache - 1/2 of RAM (default)
   - FS cache
+
+## Indexes
+
+- Keys can be any type
+- _id index is automatically created (unique to the collection)
+- other than _id, explicitly declared
+- automatically used by query planner
+- you can index array contents (multikey index)
+- can index subdocuments and subfields
+- field names are not in the index
+
+`db.foo.createIndex( {a: 1} )`
+
+Indexes are a way of finding your documents very quickly. Above is the command
+`db.collection.createIndex` will create an index. Indexes are ordered. So if
+you wanted to sort on a1 - `db.foo.find().sort({a: 1})`, you could use that index, even if you not specifyed any specific documents you want to look up, but by walking through the index, you could find the order of the documents that you want. Also, this same a1 index has a double purpose. You can walk backwars and sort on a negative 1 - `db.foo.find().sort({a: -1})`.
+
+When creating index you can specify multiple fields (compound index), and much like with the
+sort, the order is important - `db.foo.createIndex( { a : 1, b : 1 } )`. You
+can use this index to sort on a1, b1, or you can walk in backwars to sort on
+a -1, b -1 `db.foo.find().sort({a: -1, b: -1})`. **You can walk compound indexes
+worwards or backwars, but no like this `db.foo.find().sort({a: 1, b: -1})`!**
+
+`db.foo.getIndxes()` - list indexes for a collection.
+`db.foo.dropIndex({a:1})` - drop index
+
+**Multikey index**
+Presumably, you have a document `{ likes: ['tennis', 'golf'] }`. When you
+create multikey index on field `likes` actually 2 index records will be
+created: `likes -> tennis` and `likes -> golf`.
