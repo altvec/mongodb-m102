@@ -205,3 +205,9 @@ worwards or backwars, but no like this `db.foo.find().sort({a: 1, b: -1})`!**
 Presumably, you have a document `{ likes: ['tennis', 'golf'] }`. When you
 create multikey index on field `likes` actually 2 index records will be
 created: `likes -> tennis` and `likes -> golf`.
+
+### Unique Indexes
+
+This will have `unique:true` in the index createIndex options
+
+`db.foo.createIndex({document_pattern}, {unique: true})`
