@@ -211,3 +211,298 @@ created: `likes -> tennis` and `likes -> golf`.
 This will have `unique:true` in the index createIndex options
 
 `db.foo.createIndex({document_pattern}, {unique: true})`
+
+### Sparse Indexes
+
+Normally in MongoDB if a field is just simply not in a document and we created
+index on it, a key will still be added to that index or that document. If we
+need to create index on some rare field, we can issue
+`db.foo.createIndex({document_pattern}, {sparse: true})`.
+
+If an index is unique and sparse, 2 documents which do not include the field
+that indexed exist in the same collection can exists in the same collection!
+
+### TTL Indexes
+
+TTL index will be deleted after a certain number of seconds.
+`db.foo.createIndex({document_pattern}, {expireAfterSeconds: 3600})`
+
+### Geospatial Indexes
+
+`db.foo.createIndex({loc: "2dsphere"})` - this will create index using
+Spherical coordinates
+
+`db.foo.createIndex({loc: "2d"})` - this will create index using Cartesian coordinates.
+
+### Text Indexes
+
+You can do searching, which involves text or sentences and words and so on that
+are written in human language.
+
+Let's say we have a collection `sentences` with some data:
+```
+> db.sentences.count()
+11
+
+> db.sentences.find()
+{ "_id" : ObjectId("58eb50cfefe608bd6761bd09"), "words" : "Cat three granite" }
+{ "_id" : ObjectId("58eb50e5efe608bd6761bd0a"), "words" : "cat shrub ruby" }
+{ "_id" : ObjectId("58eb50f0efe608bd6761bd0b"), "words" : "Cat shrub obsidian" }
+{ "_id" : ObjectId("58eb50f5efe608bd6761bd0c"), "words" : "Cat shrub granite" }
+{ "_id" : ObjectId("58eb50fdefe608bd6761bd0d"), "words" : "Cat moss ruby" }
+{ "_id" : ObjectId("58eb5101efe608bd6761bd0e"), "words" : "Cat moss granite" }
+{ "_id" : ObjectId("58eb5108efe608bd6761bd0f"), "words" : "Cat moss obsidian" }
+{ "_id" : ObjectId("58eb510eefe608bd6761bd10"), "words" : "dog moss obsidian" }
+{ "_id" : ObjectId("58eb5111efe608bd6761bd11"), "words" : "Dog moss obsidian" }
+{ "_id" : ObjectId("58eb5117efe608bd6761bd12"), "words" : "Dog moss ruby" }
+{ "_id" : ObjectId("58eb511fefe608bd6761bd13"), "words" : "rat tree dog" }
+```
+
+We can't query this type of documents like this:
+```
+> db.sentences.find({words: 'rat'})
+>
+```
+
+But we can use regexp, like this:
+```
+> db.sentences.find({words: /rat/})
+{ "_id" : ObjectId("58eb511fefe608bd6761bd13"), "words" : "rat tree dog" }
+```
+In general performance of this will be not so great.
+
+So, there's a special facility that we can use:
+
+1. Let's create an index, a text search index type on the field 'words':
+```
+> db.sentences.createIndex({words: 'text'})
+{
+	"createdCollectionAutomatically" : false,
+	"numIndexesBefore" : 1,
+	"numIndexesAfter" : 2,
+	"ok" : 1
+    }
+```
+Now server is going to parse out all the individual words, stem them, and then
+index them all. So we're going to get multiple index entries and a B-tree
+basically. Basically one per word, which involves some stemmed form of these
+words. It's a little bit like an multikey index notion.
+
+Let's try a query now:
+```
+> db.sentences.find({$text: { $search: "cat"} })
+{ "_id" : ObjectId("58eb50cfefe608bd6761bd09"), "words" : "Cat three granite" }
+{ "_id" : ObjectId("58eb50e5efe608bd6761bd0a"), "words" : "cat shrub ruby" }
+{ "_id" : ObjectId("58eb50f0efe608bd6761bd0b"), "words" : "Cat shrub obsidian" }
+{ "_id" : ObjectId("58eb50f5efe608bd6761bd0c"), "words" : "Cat shrub granite" }
+{ "_id" : ObjectId("58eb50fdefe608bd6761bd0d"), "words" : "Cat moss ruby" }
+{ "_id" : ObjectId("58eb5101efe608bd6761bd0e"), "words" : "Cat moss granite" }
+{ "_id" : ObjectId("58eb5108efe608bd6761bd0f"), "words" : "Cat moss obsidian" }
+```
+
+Also we can score sentences that have multiple terms in them:
+```
+> db.sentences.find({$text: { $search: "cat ruby"} }, {score: {$meta:
+"textScore"}, _id: 0})
+{ "words" : "Dog moss ruby", "score" : 0.6666666666666666 }
+{ "words" : "Cat three granite", "score" : 0.6666666666666666 }
+{ "words" : "cat shrub ruby", "score" : 1.3333333333333333 }
+{ "words" : "Cat shrub obsidian", "score" : 0.6666666666666666 }
+{ "words" : "Cat shrub granite", "score" : 0.6666666666666666 }
+{ "words" : "Cat moss ruby", "score" : 1.3333333333333333 }
+{ "words" : "Cat moss granite", "score" : 0.6666666666666666 }
+{ "words" : "Cat moss obsidian", "score" : 0.6666666666666666 }
+```
+
+As you can see, sentences that have both terms have higher score.
+
+Let's sort that by score:
+```
+> db.sentences.find({$text: { $search: "cat ruby"} }, {score: {$meta:
+"textScore"}, _id: 0}).sort({score: {$meta: "textScore"}})
+{ "words" : "cat shrub ruby", "score" : 1.3333333333333333 }
+{ "words" : "Cat moss ruby", "score" : 1.3333333333333333 }
+{ "words" : "Cat three granite", "score" : 0.6666666666666666 }
+{ "words" : "Cat shrub obsidian", "score" : 0.6666666666666666 }
+{ "words" : "Cat shrub granite", "score" : 0.6666666666666666 }
+{ "words" : "Cat moss granite", "score" : 0.6666666666666666 }
+{ "words" : "Cat moss obsidian", "score" : 0.6666666666666666 }
+{ "words" : "Dog moss ruby", "score" : 0.6666666666666666 }
+```
+
+### Background Index Creation (on the Primary of the replica set)
+
+`db.foo.createIndex({}, {background: true})`
+
+- Runs in background on a primary
+- Runs foreground on secondaries
+- Slower than foreground
+- Foreground "packs" more
+- can take a while (much slower than foreground)
+
+
+## Explain Method
+
+It's how MongoDB lets you examine queries and see what indexes get used. You
+can call Explain on a collection to create an explainable object. You then get
+information on queries for that collection by executing the following methods
+against your explain object:
+- aggregate
+- find()
+- count()
+- remove()
+- update()
+- group()
+
+### Query planner vs Execution stats
+
+query planner: default
+execution stats:
+- includes query planner
+- more information
+  - time to create the query
+  - number of documents returned
+  - documents examined
+
+How to view execution stats: `db.example.explain("executionStats")`
+
+### All plans execution
+
+- a lot like executionStats
+- also runs each available plan & looks at stats
+
+Here's how to run it: `db.example.explain("allPlansExecution")`
+
+
+## Covered Queries
+
+Covered queries is a query that you're able to answer without looking at
+documents at all. In other words - it answeres the query just using the index.
+
+## Reads vs Writes
+
+- Generally, more indexes -> faster reads
+- Generally, more indexes -> slower writes
+- It is faster to build index post import than pre import
+
+
+## currentOp() and killOp()
+
+In MongoDB it's possible to see what operations are currently running on
+a given mongoD or mongoS instance and to kill them.
+
+
+## Database profiler
+
+This can be run on mongoD level.
+
+Levels (sets per database):
+- 0 - off
+- 2 - on
+- 1 - selective "give me the slow ones, based on some threshold in milliseconds"
+
+Examples:
+`db.foo.setProfilingLevel(2)`
+
+this will create new system collection - `system.profile`, so we can then query
+that and the profile operations are actually stored in system.profile
+collection for given database. 
+
+
+## Mongostat & mongotop
+
+These are part of the standart mongodb distribution, so you have them out of
+the box.
+
+```
+mongostat --help
+Usage:
+  mongostat <options> <polling interval in seconds>
+
+Monitor basic MongoDB server statistics.
+
+See http://docs.mongodb.org/manual/reference/program/mongostat/ for more information.
+
+general options:
+      --help                                      print usage
+      --version                                   print the tool version and exit
+
+verbosity options:
+  -v, --verbose=<level>                           more detailed log output (include multiple times for more verbosity, e.g.
+                                                  -vvvvv, or specify a numeric value, e.g. --verbose=N)
+      --quiet                                     hide all log output
+
+connection options:
+  -h, --host=<hostname>                           mongodb host(s) to connect to (use commas to delimit hosts)
+      --port=<port>                               server port (can also use --host hostname:port)
+
+ssl options:
+      --ssl                                       connect to a mongod or mongos that has ssl enabled
+      --sslCAFile=<filename>                      the .pem file containing the root certificate chain from the certificate
+                                                  authority
+      --sslPEMKeyFile=<filename>                  the .pem file containing the certificate and key
+      --sslPEMKeyPassword=<password>              the password to decrypt the sslPEMKeyFile, if necessary
+      --sslCRLFile=<filename>                     the .pem file containing the certificate revocation list
+      --sslAllowInvalidCertificates               bypass the validation for server certificates
+      --sslAllowInvalidHostnames                  bypass the validation for server name
+      --sslFIPSMode                               use FIPS mode of the installed openssl library
+
+authentication options:
+  -u, --username=<username>                       username for authentication
+  -p, --password=<password>                       password for authentication
+      --authenticationDatabase=<database-name>    database that holds the user's credentials
+      --authenticationMechanism=<mechanism>       authentication mechanism to use
+
+stat options:
+  -o=<field>[,<field>]*                           fields to show. For custom fields, use dot-syntax to index into
+                                                  serverStatus output, and optional methods .diff() and .rate() e.g.
+                                                  metrics.record.moves.diff()
+  -O=<field>[,<field>]*                           like -o, but preloaded with default fields. Specified fields inserted
+                                                  after default output
+      --humanReadable=                            print sizes and time in human readable format (e.g. 1K 234M 2G). To use
+                                                  the more precise machine readable format, use --humanReadable=false
+                                                  (default: true)
+      --noheaders                                 don't output column names
+  -n, --rowcount=<count>                          number of stats lines to print (0 for indefinite)
+      --discover                                  discover nodes and display stats for all
+      --http                                      use HTTP instead of raw db connection
+      --all                                       all optional fields
+      --json                                      output as JSON rather than a formatted table
+      --useDeprecatedJsonKeys                     use old key names; only valid with the json output option.
+  -i, --interactive                               display stats in a non-scrolling interface
+```
+
+Here's sample output:
+```
+mongostat --port 27017
+insert query update delete getmore command dirty used flushes vsize   res qrw arw net_in net_out conn                time
+    *0    *0     *0     *0       0     2|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   159b   42.6k    2 Apr 11 11:22:44.349
+    *0    *0     *0     *0       0     1|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   157b   42.2k    2 Apr 11 11:22:45.350
+    *0    *0     *0     *0       0     1|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   157b   42.2k    2 Apr 11 11:22:46.352
+    *0    *0     *0     *0       0     2|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   158b   42.3k    2 Apr 11 11:22:47.350
+    *0    *0     *0     *0       0     2|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   158b   42.3k    2 Apr 11 11:22:48.350
+    *0    *0     *0     *0       0     1|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   157b   42.2k    2 Apr 11 11:22:49.350
+    *0    *0     *0     *0       0     2|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   158b   42.3k    2 Apr 11 11:22:50.349
+    *0    *0     *0     *0       0     2|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   158b   42.4k    2 Apr 11 11:22:51.347
+    *0    *0     *0     *0       0     1|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   157b   42.1k    2 Apr 11 11:22:52.350
+    *0    *0     *0     *0       0     1|0  0.0% 0.3%       0 2.56G 15.0M 0|0 0|0   157b   42.2k    2 Apr 11 11:22:53.351
+```
+
+Mongotop:
+```
+mongotop --port 27017
+2017-04-11T11:25:45.817+0500	connected to: 127.0.0.1:27017
+
+                         ns    total    read    write    2017-04-11T11:25:46+05:00
+         admin.system.roles      0ms     0ms      0ms
+       admin.system.version      0ms     0ms      0ms
+          local.startup_log      0ms     0ms      0ms
+       local.system.replset      0ms     0ms      0ms
+              pcat.products      0ms     0ms      0ms
+          pcat.products_bak      0ms     0ms      0ms
+performance.sensor_readings      0ms     0ms      0ms
+      performance.sentences      0ms     0ms      0ms
+      performance.system.js      0ms     0ms      0ms
+
+```
+
