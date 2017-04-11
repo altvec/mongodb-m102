@@ -506,3 +506,302 @@ performance.sensor_readings      0ms     0ms      0ms
 
 ```
 
+
+## Homework
+
+### 3.1
+
+```
+> db.sensor_readings.createIndex({active:1, tstamp:1})
+{
+	"createdCollectionAutomatically" : false,
+	"numIndexesBefore" : 1,
+	"numIndexesAfter" : 2,
+	"ok" : 1
+}
+> db.sensor_readings.getIndexes()
+[
+	{
+		"v" : 2,
+		"key" : {
+			"_id" : 1
+		},
+		"name" : "_id_",
+		"ns" : "performance.sensor_readings"
+	},
+	{
+		"v" : 2,
+		"key" : {
+			"active" : 1,
+			"tstamp" : 1
+		},
+		"name" : "active_1_tstamp_1",
+		"ns" : "performance.sensor_readings"
+	}
+]
+> homework.a()
+6
+```
+
+### 3.2
+
+```
+> db.currentOp()
+{
+	"inprog" : [
+		{
+			"desc" : "conn8",
+			"threadId" : "0x7000062b2000",
+			"connectionId" : 8,
+			"client" : "127.0.0.1:64941",
+			"appName" : "MongoDB Shell",
+			"active" : true,
+			"opid" : 84156,
+			"secs_running" : 0,
+			"microsecs_running" : NumberLong(13),
+			"op" : "command",
+			"ns" : "admin.$cmd",
+			"query" : {
+				"currentOp" : 1
+			},
+			"numYields" : 0,
+			"locks" : {
+
+			},
+			"waitingForLock" : false,
+			"lockStats" : {
+
+			}
+		},
+		{
+			"desc" : "conn2",
+			"threadId" : "0x700005e17000",
+			"connectionId" : 2,
+			"client" : "127.0.0.1:64931",
+			"appName" : "MongoDB Shell",
+			"active" : true,
+			"opid" : 84108,
+			"secs_running" : 0,
+			"microsecs_running" : NumberLong(149488),
+			"op" : "update",
+			"ns" : "performance.sensor_readings",
+			"query" : {
+
+			},
+			"planSummary" : "COLLSCAN",
+			"numYields" : 124,
+			"locks" : {
+				"Global" : "w",
+				"Database" : "w",
+				"Collection" : "w"
+			},
+			"waitingForLock" : false,
+			"lockStats" : {
+				"Global" : {
+					"acquireCount" : {
+						"r" : NumberLong(125),
+						"w" : NumberLong(125)
+					}
+				},
+				"Database" : {
+					"acquireCount" : {
+						"w" : NumberLong(125)
+					}
+				},
+				"Collection" : {
+					"acquireCount" : {
+						"w" : NumberLong(125)
+					}
+				}
+			}
+		},
+		{
+			"desc" : "conn6",
+			"threadId" : "0x700006023000",
+			"connectionId" : 6,
+			"client" : "127.0.0.1:64937",
+			"appName" : "MongoDB Shell",
+			"active" : true,
+			"opid" : 42001,       <------------------------ process ID to kill
+			"secs_running" : 127, <------------------------ look for this!
+			"microsecs_running" : NumberLong(127239894),
+			"op" : "update",
+			"ns" : "performance.sensor_readings",
+			"query" : {
+				"$where" : "function(){sleep(500);return false;}"
+			},
+			"planSummary" : "COLLSCAN",
+			"numYields" : 252,
+			"locks" : {
+				"Global" : "w",
+				"Database" : "w",
+				"Collection" : "w"
+			},
+			"waitingForLock" : false,
+			"lockStats" : {
+				"Global" : {
+					"acquireCount" : {
+						"r" : NumberLong(257),
+						"w" : NumberLong(253)
+					}
+				},
+				"Database" : {
+					"acquireCount" : {
+						"r" : NumberLong(2),
+						"w" : NumberLong(253)
+					},
+					"acquireWaitCount" : {
+						"w" : NumberLong(3)
+					},
+					"timeAcquiringMicros" : {
+						"w" : NumberLong(404)
+					}
+				},
+				"Collection" : {
+					"acquireCount" : {
+						"r" : NumberLong(2),
+						"w" : NumberLong(253)
+					}
+				}
+			}
+		}
+	],
+	"ok" : 1
+}
+> db.killOp(42001)
+{ "info" : "attempting to kill op", "ok" : 1 }
+> homework.c()
+12
+```
+
+### 3.3
+
+```
+> db.products.count()
+12
+> db.products.createIndex({"for": 1})
+{
+	"createdCollectionAutomatically" : false,
+	"numIndexesBefore" : 1,
+	"numIndexesAfter" : 2,
+	"ok" : 1
+}
+
+> db.products.find({"for": "ac3"}).count()
+4 <-------- 4 documents matched query
+
+> db.products.find({"for": "ac3"}).explain("executionStats")
+{
+	"queryPlanner" : {
+		"plannerVersion" : 1,
+		"namespace" : "pcat.products",
+		"indexFilterSet" : false,
+		"parsedQuery" : {
+			"for" : {
+				"$eq" : "ac3"
+			}
+		},
+		"winningPlan" : {
+			"stage" : "FETCH",
+			"inputStage" : {
+				"stage" : "IXSCAN", <----------------------- Index was used
+				"keyPattern" : {
+					"for" : 1
+				},
+				"indexName" : "for_1",
+				"isMultiKey" : true,
+				"multiKeyPaths" : {
+					"for" : [
+						"for"
+					]
+				},
+				"isUnique" : false,
+				"isSparse" : false,
+				"isPartial" : false,
+				"indexVersion" : 2,
+				"direction" : "forward",
+				"indexBounds" : {
+					"for" : [
+						"[\"ac3\", \"ac3\"]"
+					]
+				}
+			}
+		},
+		"rejectedPlans" : [ ]
+	},
+	"executionStats" : {
+		"executionSuccess" : true,
+		"nReturned" : 4,
+		"executionTimeMillis" : 0,
+		"totalKeysExamined" : 4,
+		"totalDocsExamined" : 4, <------------------- 4 documents were examided
+		"executionStages" : {
+			"stage" : "FETCH",
+			"nReturned" : 4,
+			"executionTimeMillisEstimate" : 0,
+			"works" : 5,
+			"advanced" : 4,
+			"needTime" : 0,
+			"needYield" : 0,
+			"saveState" : 0,
+			"restoreState" : 0,
+			"isEOF" : 1,
+			"invalidates" : 0,
+			"docsExamined" : 4,
+			"alreadyHasObj" : 0,
+			"inputStage" : {
+				"stage" : "IXSCAN",
+				"nReturned" : 4,
+				"executionTimeMillisEstimate" : 0,
+				"works" : 5,
+				"advanced" : 4,
+				"needTime" : 0,
+				"needYield" : 0,
+				"saveState" : 0,
+				"restoreState" : 0,
+				"isEOF" : 1,
+				"invalidates" : 0,
+				"keyPattern" : {
+					"for" : 1
+				},
+				"indexName" : "for_1",
+				"isMultiKey" : true,
+				"multiKeyPaths" : {
+					"for" : [
+						"for"
+					]
+				},
+				"isUnique" : false,
+				"isSparse" : false,
+				"isPartial" : false,
+				"indexVersion" : 2,
+				"direction" : "forward",
+				"indexBounds" : {
+					"for" : [
+						"[\"ac3\", \"ac3\"]"
+					]
+				},
+				"keysExamined" : 4,
+				"seeks" : 1,
+				"dupsTested" : 4,
+				"dupsDropped" : 0,
+				"seenInvalidated" : 0
+			}
+		}
+	},
+	"serverInfo" : {
+		"host" : "delorean.local",
+		"port" : 27017,
+		"version" : "3.4.3",
+		"gitVersion" : "f07437fb5a6cca07c10bafa78365456eb1d6d5e1"
+	},
+	"ok" : 1
+}
+
+```
+
+### 3.4
+
+1. Document level locking
+2. Data compression
+
