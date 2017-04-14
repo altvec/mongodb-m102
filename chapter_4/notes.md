@@ -66,3 +66,137 @@ There are 3 ways of handlind recovery procedure:
    and apply them on newly elected primary.
 3. Automatically (which is done by MongoDB) roll back all commited writes on
    previous primary that hasn't been replicated and archive them.
+
+
+## Starting replica set
+
+Prepare replica set for initialization:
+```
+mkdir -p ./db-data/{r1,r2,r3}
+
+mongod --port 27001 --replSet abc --dbpath ./db-data/r1 --logpath ./log.1 --logappend --oplogSize 50 --smallfiles
+mongod --port 27002 --replSet abc --dbpath ./db-data/r2 --logpath ./log.2 --logappend --oplogSize 50 --smallfiles
+mongod --port 27003 --replSet abc --dbpath ./db-data/r3 --logpath ./log.3 --logappend --oplogSize 50 --smallfiles
+
+```
+
+Initiating the set:
+
+1. Specify config:
+```
+cfg = {
+    _id : "abc",
+    members : [
+        {_id : 0, host : "localhost:27001"},
+        {_id : 1, host : "localhost:27002"},
+        {_id : 2, host : "localhost:27003"}
+    ]
+}
+```
+Best practices:
+- don't use raw ip addresses
+- don't use names from /etc/hosts
+- use DNS
+    - pick an appropriate TTL (e.g. minutes)
+
+2. Initial data: `replSetInitiate` or in the shell `rs.initiate(cfg)`
+```
+> rs.initiate(cfg)
+{ "ok" : 1 }
+abc:SECONDARY>
+abc:PRIMARY>
+```
+Now our server becomes Primary.
+
+### Replica set status
+
+```
+abc:PRIMARY> rs.status()
+{
+	"set" : "abc",
+	"date" : ISODate("2017-04-14T06:03:40.245Z"),
+	"myState" : 1,
+	"term" : NumberLong(1),
+	"heartbeatIntervalMillis" : NumberLong(2000),
+	"optimes" : {
+		"lastCommittedOpTime" : {
+			"ts" : Timestamp(1492149817, 1),
+			"t" : NumberLong(1)
+		},
+		"appliedOpTime" : {
+			"ts" : Timestamp(1492149817, 1),
+			"t" : NumberLong(1)
+		},
+		"durableOpTime" : {
+			"ts" : Timestamp(1492149817, 1),
+			"t" : NumberLong(1)
+		}
+	},
+	"members" : [
+		{
+			"_id" : 0,
+			"name" : "localhost:27001",
+			"health" : 1,
+			"state" : 1,
+			"stateStr" : "PRIMARY",
+			"uptime" : 4050,
+			"optime" : {
+				"ts" : Timestamp(1492149817, 1),
+				"t" : NumberLong(1)
+			},
+			"optimeDate" : ISODate("2017-04-14T06:03:37Z"),
+			"electionTime" : Timestamp(1492149327, 1),
+			"electionDate" : ISODate("2017-04-14T05:55:27Z"),
+			"configVersion" : 1,
+			"self" : true
+		},
+		{
+			"_id" : 1,
+			"name" : "localhost:27002",
+			"health" : 1,
+			"state" : 2,
+			"stateStr" : "SECONDARY",
+			"uptime" : 503,
+			"optime" : {
+				"ts" : Timestamp(1492149817, 1),
+				"t" : NumberLong(1)
+			},
+			"optimeDurable" : {
+				"ts" : Timestamp(1492149817, 1),
+				"t" : NumberLong(1)
+			},
+			"optimeDate" : ISODate("2017-04-14T06:03:37Z"),
+			"optimeDurableDate" : ISODate("2017-04-14T06:03:37Z"),
+			"lastHeartbeat" : ISODate("2017-04-14T06:03:39.978Z"),
+			"lastHeartbeatRecv" : ISODate("2017-04-14T06:03:38.743Z"),
+			"pingMs" : NumberLong(0),
+			"syncingTo" : "localhost:27001",
+			"configVersion" : 1
+		},
+		{
+			"_id" : 3,
+			"name" : "localhost:27003",
+			"health" : 1,
+			"state" : 2,
+			"stateStr" : "SECONDARY",
+			"uptime" : 503,
+			"optime" : {
+				"ts" : Timestamp(1492149817, 1),
+				"t" : NumberLong(1)
+			},
+			"optimeDurable" : {
+				"ts" : Timestamp(1492149817, 1),
+				"t" : NumberLong(1)
+			},
+			"optimeDate" : ISODate("2017-04-14T06:03:37Z"),
+			"optimeDurableDate" : ISODate("2017-04-14T06:03:37Z"),
+			"lastHeartbeat" : ISODate("2017-04-14T06:03:39.978Z"),
+			"lastHeartbeatRecv" : ISODate("2017-04-14T06:03:38.772Z"),
+			"pingMs" : NumberLong(0),
+			"syncingTo" : "localhost:27001",
+			"configVersion" : 1
+		}
+	],
+	"ok" : 1
+}
+```
