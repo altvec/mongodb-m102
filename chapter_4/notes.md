@@ -200,3 +200,73 @@ abc:PRIMARY> rs.status()
 	"ok" : 1
 }
 ```
+
+### Replica set commands
+
+```
+abc:PRIMARY> rs.help()
+	rs.status()                                { replSetGetStatus : 1 } checks repl set status
+	rs.initiate()                              { replSetInitiate : null } initiates set with default settings
+	rs.initiate(cfg)                           { replSetInitiate : cfg } initiates set with configuration cfg
+	rs.conf()                                  get the current configuration object from local.system.replset
+	rs.reconfig(cfg)                           updates the configuration of a running replica set with cfg (disconnects)
+	rs.add(hostportstr)                        add a new member to the set with default attributes (disconnects)
+	rs.add(membercfgobj)                       add a new member to the set with extra attributes (disconnects)
+	rs.addArb(hostportstr)                     add a new member which is arbiterOnly:true (disconnects)
+	rs.stepDown([stepdownSecs, catchUpSecs])   step down as primary (disconnects)
+	rs.syncFrom(hostportstr)                   make a secondary sync from the given member
+	rs.freeze(secs)                            make a node ineligible to become primary for the time specified
+	rs.remove(hostportstr)                     remove a host from the replica set (disconnects)
+	rs.slaveOk()                               allow queries on secondary nodes
+
+	rs.printReplicationInfo()                  check oplog size and time range
+	rs.printSlaveReplicationInfo()             check replica set members and replication lag
+	db.isMaster()                              check who is primary
+
+	reconfiguration helpers disconnect from the database so the shell will display
+	an error, even if the command succeeds.
+```
+
+
+### Reading and Writing
+
+By default you can't read from Secondaries:
+```
+abc:SECONDARY> db.foo.find()
+Error: error: {
+	"ok" : 0,
+	"errmsg" : "not master and slaveOk=false",
+	"code" : 13435,
+	"codeName" : "NotMasterNoSlaveOk"
+}
+```
+
+### Read preference
+
+A.k.a `slaveOk()` - indicate that we're ok with eventually consistent reads
+from Secondaries.
+
+Reasons to do this:
+- geography (latency)
+- separate a workload (for analytics/reporting)
+- availability (during a failover)
+
+There are following available options when you connecting to DB from client side:
+- primary (default)
+- `!` `*` primaryPreffered
+- `*` secondary
+- `!` `*` secondaryPreferred
+- `!` `*` nearest (in terms of network latency)
+
+`*` - secondary is possible
+`!` - primary is possible
+
+- When in doubt, use primary preference (default).
+- When remote, use nearest (also can be good for even read loads)
+- Use secondary for certain reporting workloads, bearing in mind the
+    possibility of lag
+
+So, clearly if we used primary, we're going to only send the query to the
+primary.
+
+*Nearest may be the most even for load distribution.*
