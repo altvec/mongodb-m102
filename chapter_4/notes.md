@@ -270,3 +270,26 @@ So, clearly if we used primary, we're going to only send the query to the
 primary.
 
 *Nearest may be the most even for load distribution.*
+
+
+## Homework
+
+### 4.1
+
+Answer is: 5001
+
+### 4.2
+
+Answer is: 5002
+
+### 4.3
+
+Answer is: 5
+
+### 4.4
+
+Answer is: 6
+
+### 4.5
+
+Answer is: R
