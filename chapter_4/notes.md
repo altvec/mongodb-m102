@@ -6,18 +6,21 @@
 Replication - redundant copies of the same data across set of machines.
 
 Reasons to do replication:
+
 - HA (high availability)
 - Data safety
 - Disaster recovery
 - Scalability (you can read from replicas if you will, but generally it's may not be a good idea, because replicas can lag behing a bit)
 
 Replication:
+
 - **Replication is asynchronous**
 - **Single Primary at a given point in time**
 
 There is a possibility for synchronous replication, where client will wait for ack from replicas (actually, client sent request to primary, then request has to be propagated to replicas before you get an ack). Downside - huge latency across network.
 
 To summarize:
+
 - MongoDB replication works on commodity hardware
 - Supports a model of replication with a single primary and multiple secondaries
 - Works across wide area network
@@ -41,6 +44,7 @@ data, that's what a replica set is.
 *Replication Factor* - number of members in a replica set.
 
 Benefits of replica sets:
+
 - automatic failover
 - automatic node recovery
 
@@ -59,6 +63,7 @@ occur.
 ### Recovery
 
 There are 3 ways of handlind recovery procedure:
+
 1. Complete wipe of previous primary (which now becomes secondary) and
    replicate all data to it from newly primary. In this case we loose all the
    commited data that hasn't been replicated before failover.
@@ -93,13 +98,8 @@ cfg = {
     ]
 }
 ```
-Best practices:
-- don't use raw ip addresses
-- don't use names from /etc/hosts
-- use DNS
-    - pick an appropriate TTL (e.g. minutes)
 
-2. Initial data: `replSetInitiate` or in the shell `rs.initiate(cfg)`
+2. Initiate replica set: `replSetInitiate` or in the shell `rs.initiate(cfg)`
 ```
 > rs.initiate(cfg)
 { "ok" : 1 }
@@ -107,6 +107,13 @@ abc:SECONDARY>
 abc:PRIMARY>
 ```
 Now our server becomes Primary.
+
+Best practices:
+
+- don't use raw ip addresses
+- don't use names from /etc/hosts
+- use DNS
+    - pick an appropriate TTL (e.g. minutes)
 
 ### Replica set status
 
@@ -247,11 +254,13 @@ A.k.a `slaveOk()` - indicate that we're ok with eventually consistent reads
 from Secondaries.
 
 Reasons to do this:
+
 - geography (latency)
 - separate a workload (for analytics/reporting)
 - availability (during a failover)
 
 There are following available options when you connecting to DB from client side:
+
 - primary (default)
 - `!` `*` primaryPreffered
 - `*` secondary
